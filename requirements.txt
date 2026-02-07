@@ -1,0 +1,11 @@
+# The core bot library
+discord.py>=2.4.0
+
+# Essential for voice support (streaming audio)
+PyNaCl>=1.5.0
+
+# The downloader engine (with impersonation support)
+yt-dlp[default,curl-cffi]
+
+# Manages secret keys like your Bot Token
+python-dotenv>=1.0.0
