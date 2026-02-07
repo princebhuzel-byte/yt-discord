@@ -9,44 +9,49 @@ from dotenv import load_dotenv
 from flask import Flask
 from threading import Thread
 
-# --- WEB SERVER FOR RENDER (Keeps the service awake) ---
+# --- WEB SERVER FOR RENDER ---
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot is active and broadcasting!"
+    return "Bot is active in Guest Mode!"
 
 def run_web_server():
-    # Render default port is 10000
     app.run(host='0.0.0.0', port=10000)
 
 def keep_alive():
     t = Thread(target=run_web_server)
     t.daemon = True
     t.start()
-# -------------------------------------------------------
+# -----------------------------
 
 load_dotenv()
 
 def check_for_updates():
-    """Ensures yt-dlp is always current to bypass YouTube detection."""
     print("Checking for yt-dlp updates...")
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
-        print("yt-dlp update check complete.")
     except Exception as e:
         print(f"Update failed: {e}")
 
 check_for_updates()
 
-# Optimized for Cloud Hosting (Avoids 'impersonate' errors)
 YDL_OPTIONS = {
     'format': 'bestaudio/best',
     'noplaylist': True,
     'quiet': True,
     'no_warnings': True,
     'nocheckcertificate': True,
-    'extractor_args': {'youtube': {'player_client': ['web', 'ios']}},
+    # Guest Mode Strategy:
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'web'],
+            'player_skip': ['webpage', 'configs']
+        }
+    },
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
 }
 
 FFMPEG_OPTIONS = {
@@ -85,7 +90,7 @@ async def play_song(ctx, url):
             await ctx.send(f"🔊 Now Broadcasting: **{title}**")
             
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Detailed Error: {e}")
         await ctx.send(f"❌ Audio Error: {str(e)}")
 
 async def play_next(ctx):
@@ -100,7 +105,6 @@ async def play(ctx, url):
     
     vc = ctx.voice_client
     if not vc:
-        # Increased timeout to 60s for cloud stability
         vc = await ctx.author.voice.channel.connect(timeout=60.0, self_deaf=True)
 
     if vc.is_playing():
