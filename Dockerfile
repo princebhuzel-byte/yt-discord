@@ -1,7 +1,11 @@
 FROM python:3.11-slim
 
-# Install FFmpeg for audio processing
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+# Install system dependencies: ffmpeg for audio, nodejs/npm for YouTube signatures
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
