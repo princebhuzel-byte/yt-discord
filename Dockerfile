@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Install system dependencies: ffmpeg for audio, nodejs/npm for YouTube signatures
+# Install system dependencies: ffmpeg for audio, nodejs/npm for YouTube signatures 🧠
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     nodejs \
@@ -14,5 +14,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Run the script named app.py
+# Run the script
 CMD ["python", "app.py"]
