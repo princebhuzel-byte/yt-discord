@@ -12,7 +12,7 @@ from threading import Thread
 # --- WEB SERVER ---
 app = Flask('')
 @app.route('/')
-def home(): return "Bot is live! Check console if it asks for a login code."
+def home(): return "Bot is live! Check Render logs for the login code."
 def run_web_server(): app.run(host='0.0.0.0', port=10000)
 def keep_alive():
     t = Thread(target=run_web_server)
@@ -21,23 +21,21 @@ def keep_alive():
 
 load_dotenv()
 
-# Update yt-dlp on every boot to ensure the bypasses work
 def check_for_updates():
     try: subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
     except: pass
 check_for_updates()
 
-# --- THE AUTO-LOGIN SETTINGS ---
+# --- OAUTH2 CONFIGURATION ---
 YDL_OPTIONS = {
     'format': 'bestaudio/best',
     'noplaylist': True,
-    'quiet': True,
-    'no_warnings': True,
+    'quiet': False, # Set to False to see the login code in logs
+    'no_warnings': False,
     'nocheckcertificate': True,
-    # This enables the "TV-style" login that saves itself
     'username': 'oauth2',
     'password': '',
-    'cookiefile': 'youtube_cookies.txt', # It will SAVE the session here automatically
+    'cookiefile': 'youtube_cookies.txt', # Token will save here
     'extractor_args': {
         'youtube': {
             'player_client': ['web', 'mweb'],
@@ -55,7 +53,7 @@ class MusicBot(commands.Bot):
         intents = discord.Intents.all()
         super().__init__(command_prefix="!", intents=intents)
         self.queue = []
-    async def on_ready(self): print(f'Ready: {self.user}')
+    async def on_ready(self): print(f'Logged in as: {self.user}')
 
 bot = MusicBot()
 
@@ -71,9 +69,8 @@ async def play_song(ctx, url):
             ctx.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
             await ctx.send(f"🔊 Playing: **{title}**")
     except Exception as e:
-        # If it asks for a login, it will print in the Render logs
-        print(f"CRITICAL LOG: {e}") 
-        await ctx.send(f"❌ Error: {str(e)}")
+        print(f"AUTH ERROR/LOG: {e}") 
+        await ctx.send(f"❌ Error: Check logs to authorize the bot.")
 
 async def play_next(ctx):
     if len(bot.queue) > 0: await play_song(ctx, bot.queue.pop(0))
