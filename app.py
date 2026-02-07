@@ -6,12 +6,28 @@ import os
 import subprocess
 import sys
 from dotenv import load_dotenv
+from flask import Flask
+from threading import Thread
 
-# Load variables from .env (for local testing)
+# --- WEB SERVER FOR RENDER ---
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is alive!"
+
+def run_web_server():
+    # Render uses port 10000 by default
+    app.run(host='0.0.0.0', port=10000)
+
+def keep_alive():
+    t = Thread(target=run_web_server)
+    t.start()
+# -----------------------------
+
 load_dotenv()
 
 def check_for_updates():
-    """Ensures yt-dlp is always current."""
     print("Checking for yt-dlp updates...")
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
@@ -19,7 +35,6 @@ def check_for_updates():
     except Exception as e:
         print(f"Update failed: {e}")
 
-# Run update on startup
 check_for_updates()
 
 YDL_OPTIONS = {
@@ -49,9 +64,7 @@ bot = MusicBot()
 
 async def play_song(ctx, url):
     try:
-        # UPDATED: Use system 'ffmpeg' instead of local '.exe'
         ffmpeg_path = "ffmpeg" 
-
         async with ctx.typing():
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -59,18 +72,10 @@ async def play_song(ctx, url):
                 title = info.get('title', 'Unknown Title')
 
             await asyncio.sleep(1)
-
-            source = await discord.FFmpegOpusAudio.from_probe(
-                audio_url, 
-                executable=ffmpeg_path, 
-                **FFMPEG_OPTIONS
-            )
-            
+            source = await discord.FFmpegOpusAudio.from_probe(audio_url, executable=ffmpeg_path, **FFMPEG_OPTIONS)
             ctx.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
             await ctx.send(f"🔊 Now Broadcasting: **{title}**")
-            
     except Exception as e:
-        print(f"Error: {e}")
         await ctx.send(f"❌ Audio Error: {str(e)}")
 
 async def play_next(ctx):
@@ -82,11 +87,9 @@ async def play_next(ctx):
 async def play(ctx, url):
     if not ctx.author.voice:
         return await ctx.send("Join a voice channel first!")
-    
     vc = ctx.voice_client
     if not vc:
         vc = await ctx.author.voice.channel.connect(timeout=45.0, self_deaf=True)
-
     if vc.is_playing():
         bot.queue.append(url)
         await ctx.send("📝 Added to queue!")
@@ -100,5 +103,6 @@ async def stop(ctx):
         await ctx.voice_client.disconnect(force=True)
         await ctx.send("🛑 Stopped.")
 
-# Token is pulled from Render Environment Variables
+# Start the web server before the bot
+keep_alive()
 bot.run(os.getenv('DISCORD_TOKEN'))
