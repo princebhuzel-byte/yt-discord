@@ -21,7 +21,7 @@ def keep_alive():
 load_dotenv()
 
 # --- THE CONFIGURATION ---
-# ⚠️ PASTE YOUR LONG poToken STRING HERE
+# The token you extracted from the browser 🔐
 MY_PO_TOKEN = 'MlNaPoZ5QVRxOVoC9FsavD4qI_7VBihB2Wwftyd4rJE0-CUu1HvqCpVNwkj9TxRqM2QAa-lKvwBcm9PUW-Sg37IkkPTSq6gLWm8g_Nr2bD9ZCyiE2Q==' 
 
 YDL_OPTIONS = {
@@ -30,11 +30,14 @@ YDL_OPTIONS = {
     'quiet': False,
     'no_warnings': False,
     'nocheckcertificate': True,
-    'cookiefile': 'youtube_cookies.txt', # Ensure this file is in your GitHub!
+    'cookiefile': 'youtube_cookies.txt', 
     'extractor_args': {
         'youtube': {
             'player_client': ['web', 'mweb'],
-            'po_token': f'web+{MY_PO_TOKEN}' # Prefix 'web+' is required
+            'po_token': [
+                f'web.desktop+{MY_PO_TOKEN}',
+                f'mweb.desktop+{MY_PO_TOKEN}'
+            ]
         }
     }
 }
