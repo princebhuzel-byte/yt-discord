@@ -1,6 +1,5 @@
-discord.py
-yt-dlp
-python-dotenv
+discord.py>=2.4.0
+yt-dlp[default,curl-cffi]
+python-dotenv>=1.0.0
 Flask
-PyNaCl
-curl-cffi
+PyNaCl>=1.5.0
