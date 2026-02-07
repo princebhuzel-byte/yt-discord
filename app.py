@@ -9,22 +9,22 @@ from dotenv import load_dotenv
 from flask import Flask
 from threading import Thread
 
-# --- WEB SERVER FOR RENDER (Option A) ---
+# --- WEB SERVER FOR RENDER (Keeps the service awake) ---
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot is alive and broadcasting!"
+    return "Bot is active and broadcasting!"
 
 def run_web_server():
-    # Render uses port 10000 by default for Web Services
+    # Render default port is 10000
     app.run(host='0.0.0.0', port=10000)
 
 def keep_alive():
     t = Thread(target=run_web_server)
     t.daemon = True
     t.start()
-# -----------------------------------------
+# -------------------------------------------------------
 
 load_dotenv()
 
@@ -37,20 +37,21 @@ def check_for_updates():
     except Exception as e:
         print(f"Update failed: {e}")
 
-# Run update on startup
 check_for_updates()
 
+# Optimized for Cloud Hosting (Avoids 'impersonate' errors)
 YDL_OPTIONS = {
     'format': 'bestaudio/best',
     'noplaylist': True,
     'quiet': True,
+    'no_warnings': True,
     'nocheckcertificate': True,
-    'impersonate': 'chrome', # Requires curl-cffi in requirements.txt
+    'extractor_args': {'youtube': {'player_client': ['web', 'ios']}},
 }
 
 FFMPEG_OPTIONS = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn'
+    'options': '-vn -b:a 128k'
 }
 
 class MusicBot(commands.Bot):
@@ -61,14 +62,12 @@ class MusicBot(commands.Bot):
 
     async def on_ready(self):
         print(f'Logged in as {self.user}')
-        print("System status: Connected and ready for broadcast.")
 
 bot = MusicBot()
 
 async def play_song(ctx, url):
     try:
-        ffmpeg_path = "ffmpeg" # System path for Linux/Docker
-
+        ffmpeg_path = "ffmpeg" 
         async with ctx.typing():
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -76,7 +75,6 @@ async def play_song(ctx, url):
                 title = info.get('title', 'Unknown Title')
 
             await asyncio.sleep(1)
-
             source = await discord.FFmpegOpusAudio.from_probe(
                 audio_url, 
                 executable=ffmpeg_path, 
@@ -102,7 +100,8 @@ async def play(ctx, url):
     
     vc = ctx.voice_client
     if not vc:
-        vc = await ctx.author.voice.channel.connect(timeout=45.0, self_deaf=True)
+        # Increased timeout to 60s for cloud stability
+        vc = await ctx.author.voice.channel.connect(timeout=60.0, self_deaf=True)
 
     if vc.is_playing():
         bot.queue.append(url)
@@ -117,6 +116,5 @@ async def stop(ctx):
         await ctx.voice_client.disconnect(force=True)
         await ctx.send("🛑 Stopped.")
 
-# Start the web server and the bot
 keep_alive()
 bot.run(os.getenv('DISCORD_TOKEN'))
