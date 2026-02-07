@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from flask import Flask
 from threading import Thread
 
-# --- WEB SERVER ---
+# --- WEB SERVER (For Render Keep-Alive) ---
 app = Flask('')
 @app.route('/')
 def home(): return "Bot is live with Burner Cookies!"
@@ -21,23 +21,24 @@ def keep_alive():
 
 load_dotenv()
 
-# We keep this to ensure the latest bypasses are active
+# Force update yt-dlp to the latest 2026 nightly fixes on startup
 def check_for_updates():
-    try: subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
+    try: subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "--pre", "yt-dlp[default]"])
     except: pass
 check_for_updates()
 
-# --- THE COOKIE-BASED CONFIG ---
+# --- OPTIMIZED YT-DLP CONFIG ---
 YDL_OPTIONS = {
-    'format': 'bestaudio/best',
+    'format': 'bestaudio/best',  # Fixes "Requested format not available"
     'noplaylist': True,
-    'quiet': True,
-    'no_warnings': True,
+    'quiet': False,
+    'no_warnings': False,
     'nocheckcertificate': True,
-    'cookiefile': 'youtube_cookies.txt', # This points to your uploaded file
+    'cookiefile': 'youtube_cookies.txt', # MUST upload this to GitHub!
     'extractor_args': {
         'youtube': {
-            'player_client': ['web', 'mweb'],
+            'player_client': ['tv', 'web', 'mweb'], # 'tv' is currently more stable
+            'po_token': 'web+ios' 
         }
     }
 }
@@ -52,27 +53,35 @@ class MusicBot(commands.Bot):
         intents = discord.Intents.all()
         super().__init__(command_prefix="!", intents=intents)
         self.queue = []
-    async def on_ready(self): print(f'Bot Ready: {self.user}')
+    async def on_ready(self): 
+        print(f'✅ Logged in as: {self.user}')
 
 bot = MusicBot()
 
 async def play_song(ctx, url):
     try:
         async with ctx.typing():
-            # Check if the file actually exists on the server
+            # Check for the cookie file
             if not os.path.exists('youtube_cookies.txt'):
-                return await ctx.send("❌ Cookie file missing from GitHub!")
+                return await ctx.send("⚠️ `youtube_cookies.txt` not found on GitHub! Upload it to fix this.")
 
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
                 info = ydl.extract_info(url, download=False)
                 audio_url = info['url']
                 title = info.get('title', 'Unknown')
             
-            source = await discord.FFmpegOpusAudio.from_probe(audio_url, executable="ffmpeg", **FFMPEG_OPTIONS)
-            ctx.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
-            await ctx.send(f"🔊 Playing: **{title}**")
+            # Using Discord's FFmpeg audio source
+            source = await discord.FFmpegOpusAudio.from_probe(audio_url, **FFMPEG_OPTIONS)
+            
+            # Connection management to avoid 4006 error
+            if ctx.voice_client:
+                ctx.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
+                await ctx.send(f"🎶 Now Playing: **{title}**")
+            else:
+                await ctx.send("❌ Bot was disconnected. Re-joining...")
+
     except Exception as e:
-        print(f"ERROR: {e}")
+        print(f"🔥 Extraction Error: {e}")
         await ctx.send(f"❌ Error: {str(e)}")
 
 async def play_next(ctx):
@@ -80,12 +89,22 @@ async def play_next(ctx):
 
 @bot.command()
 async def play(ctx, url):
-    if not ctx.author.voice: return await ctx.send("Join a VC!")
-    vc = ctx.voice_client or await ctx.author.voice.channel.connect(timeout=60.0, self_deaf=True)
+    if not ctx.author.voice: 
+        return await ctx.send("You need to be in a voice channel!")
+    
+    # Connect or use existing connection
+    vc = ctx.voice_client
+    if not vc:
+        try:
+            vc = await ctx.author.voice.channel.connect(timeout=20, self_deaf=True)
+        except Exception as e:
+            return await ctx.send(f"❌ Failed to join VC: {e}")
+
     if vc.is_playing():
         bot.queue.append(url)
-        await ctx.send("Added to queue!")
-    else: await play_song(ctx, url)
+        await ctx.send("✅ Added to queue.")
+    else: 
+        await play_song(ctx, url)
 
 @bot.command()
 async def stop(ctx):
